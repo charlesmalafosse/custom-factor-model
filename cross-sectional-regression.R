@@ -1,6 +1,6 @@
 ###################################################################################################################
 #
-#
+# CROSS-SECTIONAL REGRESSION ON A SINGLE DATE 
 # Code written by Charles Malafosse, 2020
 # This is an example of cross-sectional regression implemented in R. For more information please check my article on medium.com
 #
@@ -12,12 +12,21 @@ library ("splitstackshape")
 
 
 ################################################################################################################
-#
-#  CODE FOR CROSS-SECTIONAL REGRESSION ON A SINGLE DATE 
-#
+#  Z-SCORE CALCULATION FUNCTION - FOR WEIGHTED MEAN OF 0 AND STDEV OF 1
 ################################################################################################################
+zscoreweighted <- function (x, wgt, UpperBoundWinsorized, LowerBoundWinsorized) {
+  ## Returns z-scored values
+  x[x == 0] <- NA # Exposure kept to zero.
+  x.mean <- weighted.mean(x,wgt,na.rm=TRUE)
+  x.sd <- sd(x,na.rm=TRUE)
+  x.z <- (x-x.mean) /x.sd
+  x.z <- sapply(x.z, min, UpperBoundWinsorized)
+  x.z <- sapply(x.z, max, LowerBoundWinsorized)
+  x[is.na(x)] <- 0
+  return(x.z)
+}
 
-
+  
 #################################################################
 #  LOAD THE DATA
 #################################################################
@@ -35,7 +44,27 @@ constraints_matrix <-  as.matrix(constraints_matrix[ ,!(colnames(constraints_mat
 #  FORMAT THE ZSCORES TO CREATE STANDARDIZED NORMAL ZSCORES
 #################################################################
 # (ALREADY DONE IN FILE EXAMPLES) CREATE Z-SCORES OF Z-SCORES UNTIL THE Z-SCORE MEAN GET CLOSE TO 0
-
+# Z-scores are modified to be market cap weighted market neutral.
+list_factors <- c('factor1','factor2','factor3','factor4','factor5')
+for (istyle in list_factors) {
+  print(istyle)
+  zscores_values<- factor_data[,istyle]
+  zscores_new_values<- factor_data[,istyle]
+  ZscoresSum<- 0
+  print(abs(weighted.mean(zscores_values, factor_data$wgt, na.rm=TRUE)))
+  # ITERATE ZSCORE CALCULATION UNTIL THE ZSCORE DISTRIBUTION HAS A WEIGHTED MEAN OF 0 AND A STDEV OF 1
+  while ( (abs(weighted.mean(zscores_values, factor_data$wgt ,na.rm=TRUE)) > 0.0001 | abs(sd(zscores_values,na.rm=TRUE)-1) > 0.0001 ) & ZscoresSum != abs(weighted.mean(zscores_values, factor_data$wgt,na.rm=TRUE))) {
+    ZscoresSum <- abs(weighted.mean(zscores_values, factor_data$wgt,na.rm=TRUE))
+    zscores_new_values <- zscoreweighted(zscores_values, factor_data$wgt, 3, -3)
+    
+    if (abs(weighted.mean(zscores_new_values, factor_data$wgt ,na.rm=TRUE) ) < abs(weighted.mean(zscores_values, factor_data$wgt, na.rm=TRUE))) {
+      zscores_values = zscores_new_values
+    }
+    print(abs(weighted.mean(zscores_values, factor_data$wgt ,na.rm=TRUE)))
+  }
+  
+  factor_data[,istyle] <- zscores_values
+}
 
 #################################################################
 #  FORMAT THE DATA TO APPLY DIFFERENT WEIGHTS ON EACH EQUATION
